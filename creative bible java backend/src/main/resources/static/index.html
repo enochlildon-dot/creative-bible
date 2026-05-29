@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Creative Bible</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&amp;family=Playfair+Display:wght@400;700&amp;display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'DM Sans', sans-serif; }
+    .heading-font { font-family: 'Playfair Display', serif; }
+    .acc-body { max-height: 0; overflow: hidden; transition: max-height 0.4s ease; }
+    .acc-body.open { max-height: 1200px; }
+    .edit-controls { display: none !important; }
+    body.admin-mode .edit-controls { display: flex !important; }
+    .section-title-link:hover { color: #c9a84c; }
+    @keyframes glitterIn {
+      0% { opacity: 0; transform: scale(0.8); filter: blur(4px); }
+      50% { opacity: 1; transform: scale(1.05); }
+      100% { opacity: 1; transform: scale(1); filter: blur(0); }
+    }
+    @keyframes sparkle {
+      0%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
+      50% { opacity: 1; transform: scale(1) rotate(180deg); }
+    }
+    .intro-title {
+      animation: glitterIn 1.5s ease-out forwards; opacity: 0;
+      background: linear-gradient(135deg, #1e3a5f, #2c5282, #1e3a5f);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; position: relative;
+    }
+    .sparkle-dot { position: absolute; width: 8px; height: 8px; background: radial-gradient(circle, #ffd700, transparent); border-radius: 50%; animation: sparkle 1.5s ease-in-out infinite; pointer-events: none; }
+    .intro-desc { animation: glitterIn 1.5s ease-out 0.8s forwards; opacity: 0; }
+    .menu-panel { position: fixed; top: 0; left: 0; width: 280px; height: 100%; background: #0f1b2d; z-index: 80; transform: translateX(-100%); transition: transform 0.3s ease; overflow-y: auto; display: flex; flex-direction: column; }
+    .menu-panel.open { transform: translateX(0); }
+    #menu-btn.hidden-on-menu { display: none; }
+    .menu-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 75; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+    .menu-overlay.open { opacity: 1; pointer-events: auto; }
+    #phase-nav { flex: 1; overflow-y: auto; }
+    .menu-footer { border-top: 1px solid #374151; padding: 1rem; display: none; }
+    .sticky-note { position: fixed; top: 50%; right: 2rem; transform: translateY(-50%); width: 280px; max-height: 70vh; background: linear-gradient(135deg, #fef08a 0%, #fde047 100%); border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); padding: 1.5rem; z-index: 70; display: flex; flex-direction: column; border: 2px solid #facc15; animation: slideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    @keyframes slideIn { from { opacity:0; transform: translateY(-50%) translateX(100px); } to { opacity:1; transform: translateY(-50%) translateX(0); } }
+    @keyframes slideOut { from { opacity:1; transform: translateY(-50%) translateX(0); } to { opacity:0; transform: translateY(-50%) translateX(100px); } }
+    .sticky-note-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; padding-bottom:1rem; border-bottom:2px dashed rgba(0,0,0,0.1); }
+    .sticky-note-close { background:none; border:none; cursor:pointer; color:#92400e; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; transition: all 0.2s; }
+    .sticky-note-close:hover { background: rgba(0,0,0,0.1); }
+    #menu-btn, #admin-btn, #sticky-bubble { opacity: 0; transition: opacity 0.4s ease; }
+    .save-toast { position: fixed; top: 4rem; left: 50%; transform: translateX(-50%); background: #10b981; color: white; px-4 py-2 rounded shadow-lg z-[200] text-sm; padding: 0.5rem 1rem; border-radius: 0.375rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); z-index: 200; }
+  </style>
+  <link rel="stylesheet" href="/css/styles.css">
+  <script>
+    window.API_BASE_URL = window.location.origin || '';
+  </script>
+  <script src="/js/app.js" defer></script>
+ </head>
+ <body data-template-id="__page-root" class="min-h-screen" style="background: rgb(248, 249, 250);">
+  <div id="intro-screen" class="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center p-8 cursor-pointer" onclick="enterApp()">
+   <div class="relative inline-block">
+    <h1 class="intro-title heading-font text-5xl md:text-7xl font-bold text-center">Creative Bible</h1><span class="sparkle-dot" style="top:-10px;left:10%;animation-delay:0s;"></span> <span class="sparkle-dot" style="top:20%;right:-5px;animation-delay:0.3s;"></span> <span class="sparkle-dot" style="bottom:0;left:40%;animation-delay:0.6s;"></span> <span class="sparkle-dot" style="top:5%;right:20%;animation-delay:0.9s;"></span> <span class="sparkle-dot" style="bottom:-8px;right:10%;animation-delay:1.2s;"></span> <span class="sparkle-dot" style="top:50%;left:-8px;animation-delay:0.4s;"></span>
+   </div>
+   <p data-template-id="intro-description" class="canva-text intro-desc text-center max-w-lg mt-6 text-slate-600 leading-relaxed" style="color: rgb(71, 85, 105); font-weight: 400; font-style: normal; font-size: 16px;">Your all-in-one marketing strategy companion. Explore six strategic phases — from research and customer insights to brand building, execution, and growth. Organize your thinking, save notes, and master the creative process.</p>
+  </div><button id="menu-btn" class="fixed top-4 left-4 z-[90] p-2.5 rounded-full bg-slate-800 text-white hover:bg-slate-700 transition-colors shadow-lg" title="Menu" onclick="toggleMenu()"><i data-lucide="menu" class="w-5 h-5"></i></button> <button id="admin-btn" class="fixed top-4 right-4 z-[90] p-2.5 rounded-full bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors shadow-lg" title="Admin" onclick="handleAdminBtn()"><i data-lucide="settings" class="w-5 h-5"></i></button>
+  <div id="sticky-bubble" class="fixed bottom-6 right-6 z-[90] w-14 h-14 rounded-full bg-gradient-to-br from-amber-500 to-amber-600 cursor-pointer flex items-center justify-center shadow-lg hover:scale-105 transition-transform" onclick="toggleStickyNote()" title="Sticky Note"><i data-lucide="sticky-note" class="w-6 h-6 text-white"></i>
+  </div>
+  <div id="menu-overlay" class="menu-overlay" onclick="toggleMenu()"></div>
+  <aside id="menu-panel" class="menu-panel">
+   <div class="p-6 border-b border-slate-700/30">
+    <h1 data-template-id="brand-title" class="canva-text heading-font text-lg" style="color: rgb(201, 168, 76); font-weight: 700; font-style: normal; font-size: 32px;">Creative Bible</h1>
+    <p data-template-id="brand-subtitle" class="canva-text text-xs mt-1 opacity-70" style="color: rgb(148, 163, 184); font-weight: 400; font-style: normal; font-size: 16px;">Marketing Strategy Playbook</p>
+   </div>
+   <nav class="py-4" id="phase-nav" aria-label="Phase navigation"></nav>
+   <div class="edit-controls hidden px-4 py-2 border-t border-slate-700/30">
+    <button onclick="addPhase()" class="w-full flex items-center justify-center gap-2 px-3 py-2 border-2 border-dashed border-amber-600/50 text-amber-600 rounded hover:bg-amber-600/10 text-xs font-medium"><i data-lucide="plus" class="w-4 h-4"></i> Add Phase</button>
+   </div>
+  </aside>
+  <main id="main-content" class="hidden min-h-screen p-6 pt-16 md:p-12 md:pt-16">
+   <div id="phases-container"></div>
+   <div id="sticky-note-container"></div>
+   <div id="admin-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-[95]">
+    <div class="bg-white rounded-lg shadow-lg p-6 w-80">
+     <h3 class="text-lg font-semibold text-slate-900 mb-4">Admin Access</h3>
+     <p class="text-sm text-slate-600 mb-4">Enter password to unlock editing controls</p><input type="password" id="admin-password" placeholder="Password" class="w-full border border-slate-300 rounded px-3 py-2 text-sm mb-4 focus:ring-2 focus:ring-amber-400">
+     <div class="flex gap-2">
+      <button onclick="checkAdminPassword()" class="flex-1 px-3 py-2 bg-amber-600 text-white text-sm rounded hover:bg-amber-700">Unlock</button> <button onclick="closeAdminModal()" class="flex-1 px-3 py-2 bg-slate-200 text-slate-700 text-sm rounded hover:bg-slate-300">Cancel</button>
+     </div>
+    </div>
+   </div>
+  </main>
+  
+  <script>
+    // Reference data
+    const defaultPhases = [
+      { title: "Research & Planning", desc: "Conduct primary and secondary research to analyze market structure, competitive landscape, and define business objectives.", sections: [
+        { title: "Primary Research", body: "Conduct primary research through surveys and focus groups. Gather qualitative and quantitative insights to inform strategy and planning." },
+        { title: "Market Analysis", body: "Analyze market structure, levels, and competitive landscape. Identify opportunities and threats. Define business and marketing objectives clearly." },
+        { title: "Marketing Plan", body: "Develop a formal marketing plan with clear objectives, strategies, timelines, and success metrics aligned with business goals." }
+      ]},
+      { title: "Customer Strategy", desc: "Divide consumers into clusters based on shared traits and develop detailed customer personas.", sections: [
+        { title: "Market Segmentation", body: "Divide consumers into clusters based on demographics, psychographics, and behavioral patterns." },
+        { title: "Customer Personas", body: "Create detailed customer profiles or personas to humanize segments." },
+        { title: "Needs & Motivations", body: "Map the target audience's psychological needs, motivations, and pain points." }
+      ]},
+      { title: "Brand Identity Development", desc: "Define brand essence, personality, and values that differentiate from competitors.", sections: [
+        { title: "Brand Essence & Values", body: "Define the brand essence, core values, and personality traits." },
+        { title: "Brand Management", body: "Control and manage brand identity through consistent visual and verbal communication." },
+        { title: "Brand Positioning", body: "Establish clear brand positioning in the market using positioning maps." }
+      ]},
+      { title: "Product & Marketing Mix", desc: "Develop the marketing mix strategy ensuring brand identity is reflected.", sections: [
+        { title: "Brand Identity", body: "Define the brand essence, personality traits, and values that differentiate from competitors." },
+        { title: "Product Development", body: "Design and develop products that align with brand identity and market position." },
+        { title: "4Ps Implementation", body: "Develop the marketing mix (Product, Price, Place, Promotion)." }
+      ]},
+      { title: "Promotional Execution", desc: "Execute launch campaigns with awareness strategies across channels.", sections: [
+        { title: "Channel Selection", body: "Select appropriate promotional channels such as social media, digital campaigns, PR, and events." },
+        { title: "Campaign Execution", body: "Execute launch campaigns designed to increase awareness." },
+        { title: "Performance Optimization", body: "Measure campaign effectiveness and optimize conversion mechanics." }
+      ]},
+      { title: "Sales & Customer Experience", desc: "Define the sales funnel, map customer journey, and optimize retention.", sections: [
+        { title: "Sales Funnel & Metrics", body: "Define the sales funnel and operational architecture for customer conversion." },
+        { title: "Customer Journey", body: "Map the customer journey from awareness through loyalty." },
+        { title: "Retention Strategy", body: "Implement retention strategies based on performance data." }
+      ]}
+    ];
+
+... (file continues)
