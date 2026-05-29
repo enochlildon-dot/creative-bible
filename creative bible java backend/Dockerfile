@@ -1,7 +1,9 @@
-FROM maven:3.8.4-openjdk-17 AS build
+# Use Eclipse Temurin Maven image to build the app
+FROM maven:3.8.8-eclipse-temurin-17 AS build
 COPY . .
 RUN mvn clean package -DskipTests
 
-FROM openjdk:17-jdk-slim
+# Use Eclipse Temurin JRE image to run the app
+FROM eclipse-temurin:17-jre-alpine
 COPY --from=build /target/*.jar app.jar
 ENTRYPOINT ["java","-jar","/app.jar"]
