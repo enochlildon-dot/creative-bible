@@ -38,9 +38,8 @@ public class RecordsController {
     @PostMapping
     public ResponseEntity<?> createOrUpdate(@RequestBody Record record) {
         logger.info("=== CREATE/UPDATE REQUEST ===");
-        logger.info("Received record: type={}, phase={}, section={}", record.getType(), record.getPhase_index(), record.getSection_index());
-        
         if (record == null) return ResponseEntity.badRequest().body("Invalid payload");
+        logger.info("Received record: type={}, phase={}, section={}", record.getType(), record.getPhase_index(), record.getSection_index());
         List<Record> records = storage.loadRecords();
         int idx = storage.findRecordIndex(records, record);
         if (idx >= 0) {

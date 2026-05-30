@@ -44,13 +44,18 @@
     .sticky-note-close { background:none; border:none; cursor:pointer; color:#92400e; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; transition: all 0.2s; }
     .sticky-note-close:hover { background: rgba(0,0,0,0.1); }
     #menu-btn, #admin-btn, #sticky-bubble { opacity: 0; transition: opacity 0.4s ease; }
-    .save-toast { position: fixed; top: 4rem; left: 50%; transform: translateX(-50%); background: #10b981; color: white; px-4 py-2 rounded shadow-lg z-[200] text-sm; padding: 0.5rem 1rem; border-radius: 0.375rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); z-index: 200; }
+    .save-toast { position: fixed; top: 4rem; left: 50%; transform: translateX(-50%); background: #10b981; color: white; padding: 0.5rem 1rem; border-radius: 0.375rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); z-index: 200; font-size: 0.875rem; }
+    #save-all-fixed-btn { position: fixed; bottom: 5rem; right: 1.25rem; z-index: 110; display: none; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem 1rem; background: #fb923c; color: white; border-radius: 9999px; box-shadow: 0 15px 30px rgba(15, 23, 42, 0.18); border: none; font-size: 0.85rem; cursor: pointer; transition: transform 0.2s ease, background 0.2s ease;
+    }
+    #save-all-fixed-btn:hover { transform: translateY(-2px); background: #f97316; }
+    #save-all-fixed-btn.show { display: inline-flex; }
   </style>
   <link rel="stylesheet" href="/css/styles.css">
   <script>
     window.API_BASE_URL = window.location.origin || '';
   </script>
-  <script src="/js/app.js" defer></script>
+   <script src="/js/dataSdk.js?v=2"></script>
+  <script src="/js/app.js?v=2"></script>
  </head>
  <body data-template-id="__page-root" class="min-h-screen" style="background: rgb(248, 249, 250);">
   <div id="intro-screen" class="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center p-8 cursor-pointer" onclick="enterApp()">
@@ -62,14 +67,16 @@
   <div id="sticky-bubble" class="fixed bottom-6 right-6 z-[90] w-14 h-14 rounded-full bg-gradient-to-br from-amber-500 to-amber-600 cursor-pointer flex items-center justify-center shadow-lg hover:scale-105 transition-transform" onclick="toggleStickyNote()" title="Sticky Note"><i data-lucide="sticky-note" class="w-6 h-6 text-white"></i>
   </div>
   <div id="menu-overlay" class="menu-overlay" onclick="toggleMenu()"></div>
+  <button id="save-all-fixed-btn" type="button" onclick="saveAllChanges()" title="Save all pending changes">💾 Save All Changes</button>
   <aside id="menu-panel" class="menu-panel">
    <div class="p-6 border-b border-slate-700/30">
     <h1 data-template-id="brand-title" class="canva-text heading-font text-lg" style="color: rgb(201, 168, 76); font-weight: 700; font-style: normal; font-size: 32px;">Creative Bible</h1>
     <p data-template-id="brand-subtitle" class="canva-text text-xs mt-1 opacity-70" style="color: rgb(148, 163, 184); font-weight: 400; font-style: normal; font-size: 16px;">Marketing Strategy Playbook</p>
    </div>
    <nav class="py-4" id="phase-nav" aria-label="Phase navigation"></nav>
-   <div class="edit-controls hidden px-4 py-2 border-t border-slate-700/30">
+   <div class="edit-controls hidden px-4 py-2 border-t border-slate-700/30 space-y-2">
     <button onclick="addPhase()" class="w-full flex items-center justify-center gap-2 px-3 py-2 border-2 border-dashed border-amber-600/50 text-amber-600 rounded hover:bg-amber-600/10 text-xs font-medium"><i data-lucide="plus" class="w-4 h-4"></i> Add Phase</button>
+    <button id="save-all-btn" onclick="saveAllChanges()" class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-amber-600 text-white rounded hover:bg-amber-700 text-xs font-medium" title="Save all pending changes">💾 Save All Changes</button>
    </div>
   </aside>
   <main id="main-content" class="hidden min-h-screen p-6 pt-16 md:p-12 md:pt-16">
@@ -183,10 +190,16 @@
     }
 
     async function initApp() {
-      const result = await window.dataSdk.init(dataHandler);
-      if (!result.isOk) {
-        console.error('Data SDK init failed');
+      if (window.dataSdk && typeof window.dataSdk.init === 'function') {
+        const result = await window.dataSdk.init(dataHandler);
+        if (!result.isOk) {
+          console.error('Data SDK init failed');
+        }
+        return;
       }
+
+      console.warn('Data SDK not fully loaded yet, retrying shortly...');
+      setTimeout(initApp, 500);
     }
 
     function enterApp() {
@@ -467,15 +480,25 @@
 
     // Show pending indicator
     function showPendingIndicator(){
-      const btn = document.getElementById('save-all-btn');
-      if(btn && Object.keys(pendingChanges).length > 0){
-        btn.textContent = '💾 Save All Changes (' + Object.keys(pendingChanges).length + ')';
+      const count = Object.keys(pendingChanges).length;
+      const mainBtn = document.getElementById('save-all-btn');
+      const fixedBtn = document.getElementById('save-all-fixed-btn');
+      const label = count > 0 ? `💾 Save All Changes (${count})` : '💾 Save All Changes';
+
+      if(mainBtn){
+        mainBtn.textContent = label;
+        mainBtn.disabled = false;
+      }
+      if(fixedBtn){
+        fixedBtn.textContent = label;
+        fixedBtn.classList.toggle('show', count > 0);
+        fixedBtn.disabled = count === 0;
       }
     }
 
     // Save all pending changes to database
     async function saveAllChanges(){
-      const btn = document.getElementById('save-all-btn');
+      const btn = document.getElementById('save-all-btn') || document.getElementById('save-all-fixed-btn');
       if(!btn || Object.keys(pendingChanges).length === 0) return;
       
       btn.disabled = true;
@@ -496,12 +519,14 @@
         }
         
         pendingChanges = {};
+        showPendingIndicator();
         btn.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i> Saved!';
         btn.style.background = '#10b981';
         setTimeout(()=>{
           btn.disabled=false;
           btn.innerHTML = '<i data-lucide="save" class="w-4 h-4"></i> Save All Changes';
           btn.style.background = '';
+          showPendingIndicator();
         }, 2000);
         
         showSaveToast('All changes saved to Canva Sheet!');
@@ -562,18 +587,28 @@
     }
 
     function addPhase(){
-      // Not persisted as structural add — just local
+      const newIndex = phases.length;
       phases.push({title:"New Phase",desc:"Phase description",sections:[{title:"New Section",body:"Add your content here..."}]});
+      pendingChanges[`phase_${newIndex}`] = {type:'phase_edit', phase_index:newIndex, section_index:-1, title:'New Phase', body:'Phase description', link_url:'', notes:''};
+      pendingChanges[`section_${newIndex}_0`] = {type:'section_edit', phase_index:newIndex, section_index:0, title:'New Section', body:'Add your content here...', link_url:'', notes:''};
       renderSidebarPhases();currentPhase=phases.length-1;renderPhase();
+      showPendingIndicator();
     }
 
     function addSubPhase(){
       const p=phases[currentPhase];
+      const sectionIndex = p.sections.length;
       p.sections.push({title:"New Sub-Phase",body:"Add your content here..."});
+      pendingChanges[`section_${currentPhase}_${sectionIndex}`] = {type:'section_edit', phase_index:currentPhase, section_index:sectionIndex, title:'New Sub-Phase', body:'Add your content here...', link_url:'', notes:''};
       renderPhase();
+      showPendingIndicator();
     }
 
     document.addEventListener('DOMContentLoaded',()=>{document.getElementById('admin-modal').addEventListener('keypress',e=>{if(e.key==='Enter')checkAdminPassword();});});
+    window.saveAllChanges = saveAllChanges;
+    window.showPendingIndicator = showPendingIndicator;
+    window.addPhase = addPhase;
+    window.addSubPhase = addSubPhase;
   </script>
  <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a02517b5db6bd16e',t:'MTc3OTg4NTY3Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body></html>

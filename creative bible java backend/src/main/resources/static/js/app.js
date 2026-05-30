@@ -3,6 +3,8 @@ function debugLog(msg, data) {
   console.log(`[CREATIVE BIBLE] ${msg}`, data || '');
 }
 
+console.log('app.js loaded', { dataSdk: window.dataSdk });
+
 function sanitizePayload(obj) {
   debugLog('Raw payload:', obj);
   const json = JSON.stringify(obj);
@@ -90,23 +92,35 @@ function escAttr(s) {
     .replace(/</g, '&lt;');
 }
 
+function ensurePhaseExists(index) {
+  while (phases.length <= index) {
+    phases.push({ title: 'Untitled Phase', desc: '', sections: [] });
+  }
+}
+
+function ensureSectionExists(phaseIndex, sectionIndex) {
+  ensurePhaseExists(phaseIndex);
+  const phase = phases[phaseIndex];
+  while (phase.sections.length <= sectionIndex) {
+    phase.sections.push({ title: 'Untitled Sub-Phase', body: '' });
+  }
+}
+
 function applyEditsFromData() {
   phases = JSON.parse(JSON.stringify(defaultPhases));
   allRecords
     .filter((r) => r.type === 'phase_edit')
     .forEach((r) => {
-      if (phases[r.phase_index]) {
-        if (r.title) phases[r.phase_index].title = r.title;
-        if (r.body) phases[r.phase_index].desc = r.body;
-      }
+      ensurePhaseExists(r.phase_index);
+      if (r.title) phases[r.phase_index].title = r.title;
+      if (r.body) phases[r.phase_index].desc = r.body;
     });
   allRecords
     .filter((r) => r.type === 'section_edit')
     .forEach((r) => {
-      if (phases[r.phase_index] && phases[r.phase_index].sections[r.section_index]) {
-        if (r.title) phases[r.phase_index].sections[r.section_index].title = r.title;
-        if (r.body) phases[r.phase_index].sections[r.section_index].body = r.body;
-      }
+      ensureSectionExists(r.phase_index, r.section_index);
+      if (r.title) phases[r.phase_index].sections[r.section_index].title = r.title;
+      if (r.body) phases[r.phase_index].sections[r.section_index].body = r.body;
     });
 }
 
@@ -586,11 +600,24 @@ function closeStickyNote() {
 }
 
 function showPendingIndicator() {
-  // No-op: auto-save has replaced manual save
+  const mainBtn = document.getElementById('save-all-btn');
+  const fixedBtn = document.getElementById('save-all-fixed-btn');
+  const count = Object.keys(pendingChanges).length;
+  const label = count > 0 ? `💾 Save All Changes (${count})` : '💾 Save All Changes';
+
+  if (mainBtn) {
+    mainBtn.textContent = label;
+    mainBtn.disabled = false;
+  }
+  if (fixedBtn) {
+    fixedBtn.textContent = label;
+    fixedBtn.classList.toggle('show', count > 0);
+    fixedBtn.disabled = count === 0;
+  }
 }
 
 async function saveAllChanges() {
-  const btn = document.getElementById('save-all-btn');
+  const btn = document.getElementById('save-all-btn') || document.getElementById('save-all-fixed-btn');
   if (!btn) return;
   debugLog('saveAllChanges - pendingChanges count:', Object.keys(pendingChanges).length);
   if (Object.keys(pendingChanges).length === 0) {
@@ -697,97 +724,47 @@ function finalizeExit() {
 }
 
 function addPhase() {
+  const newIndex = phases.length;
   phases.push({ title: 'New Phase', desc: 'Phase description', sections: [{ title: 'New Section', body: 'Add your content here...' }] });
-  currentPhase = phases.length - 1;
+  currentPhase = newIndex;
+  pendingChanges[`phase_${newIndex}`] = {
+    type: 'phase_edit',
+    phase_index: newIndex,
+    section_index: -1,
+    title: 'New Phase',
+    body: 'Phase description',
+    link_url: '',
+    notes: ''
+  };
+  pendingChanges[`section_${newIndex}_0`] = {
+    type: 'section_edit',
+    phase_index: newIndex,
+    section_index: 0,
+    title: 'New Section',
+    body: 'Add your content here...',
+    link_url: '',
+    notes: ''
+  };
   renderSidebarPhases();
   renderPhase();
+  showPendingIndicator();
 }
 
 function addSubPhase() {
+  const sectionIndex = phases[currentPhase].sections.length;
   phases[currentPhase].sections.push({ title: 'New Sub-Phase', body: 'Add your content here...' });
+  pendingChanges[`section_${currentPhase}_${sectionIndex}`] = {
+    type: 'section_edit',
+    phase_index: currentPhase,
+    section_index: sectionIndex,
+    title: 'New Sub-Phase',
+    body: 'Add your content here...',
+    link_url: '',
+    notes: ''
+  };
   renderPhase();
+  showPendingIndicator();
 }
-
-window.dataSdk = {
-  async init(handler) {
-    try {
-      const response = await apiFetch('/api/records');
-      if (!response.ok) throw new Error('Fetch failed');
-      const data = await response.json();
-      handler.onDataChanged(data);
-      return { isOk: true };
-    } catch (error) {
-      console.error(error);
-      handler.onDataChanged([]);
-      return { isOk: false };
-    }
-  },
-  async create(payload) {
-    try {
-      debugLog('create - Payload:', payload);
-      const response = await apiFetch('/api/records', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      debugLog('create - Response status:', response.status);
-      const data = await response.json();
-      debugLog('create - Response data:', data);
-      return { isOk: response.ok, data };
-    } catch (error) {
-        debugLog('create - ERROR:', error);
-        return { isOk: false, error };
-    }
-  },
-  async update(payload) {
-    debugLog('update - Payload:', payload);
-    return this.create(payload);
-  },
-  async bulkCreate(payload) {
-    try {
-      debugLog('BULK CREATE - Raw payload:', payload);
-      
-      // Ensure payload is array
-      const payloadArray = Array.isArray(payload) ? payload : [payload];
-      debugLog('BULK CREATE - Ensured as array:', payloadArray);
-      
-      // Stringify and parse to remove any circular refs
-      const jsonString = JSON.stringify(payloadArray);
-      debugLog('BULK CREATE - JSON string:', jsonString);
-      
-      const response = await apiFetch('/api/records/bulk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: jsonString
-      });
-      
-      debugLog('BULK CREATE - Response status:', response.status);
-      const data = await response.json();
-      debugLog('BULK CREATE - Response data:', data);
-      return { isOk: response.ok, data };
-    } catch (error) {
-      debugLog('BULK CREATE - ERROR:', error);
-      return { isOk: false, error };
-    }
-  },
-  async delete(payload) {
-    try {
-      debugLog('delete - Payload:', payload);
-      const response = await apiFetch('/api/records', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      debugLog('delete - Response status:', response.status);
-      const data = await response.json();
-      debugLog('delete - Response data:', data);
-      return { isOk: response.ok, data };
-    } catch (error) {
-      debugLog('delete - ERROR:', error);
-      return { isOk: false, error };
-    }
-  }
-};
 
 window.addEventListener('load', () => {
   initApp();
@@ -801,3 +778,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Enter') checkAdminPassword();
   });
 });
+
+window.saveAllChanges = saveAllChanges;
+window.showPendingIndicator = showPendingIndicator;
+window.addPhase = addPhase;
+window.addSubPhase = addSubPhase;
