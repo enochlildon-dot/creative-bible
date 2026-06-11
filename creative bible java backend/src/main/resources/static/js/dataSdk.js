@@ -1,10 +1,10 @@
-const API_BASE_URL = window.API_BASE_URL || '';
-console.log('dataSdk.js loaded', { API_BASE_URL, dataSdk: window.dataSdk });
-
 function sdkApiFetch(route, options) {
-  const url = API_BASE_URL ? `${API_BASE_URL}${route}` : route;
+  const apiBaseUrl = window.API_BASE_URL || '';
+  const url = apiBaseUrl ? `${apiBaseUrl}${route}` : route;
   return fetch(url, options);
 }
+
+console.log('dataSdk.js loaded', { apiBaseUrl: window.API_BASE_URL || '', dataSdk: window.dataSdk });
 
 function sdkDebugLog(msg, data) {
   if (window.debugLog && typeof window.debugLog === 'function') {
