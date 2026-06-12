@@ -283,14 +283,57 @@ function deletePhase(idx) {
 
 function confirmDeletePhase(idx) {
   document.getElementById('delete-phase-modal').remove();
+  const affectedRecords = allRecords.filter((r) => r.phase_index === idx);
+
+  affectedRecords.forEach((record) => {
+    if (record._id) {
+      pendingChanges[`delete_${record._id}`] = {
+        _delete: true,
+        _id: record._id
+      };
+    }
+  });
+
+  removePendingChangesForPhase(idx);
   phases.splice(idx, 1);
   if (currentPhase >= phases.length) currentPhase = Math.max(0, phases.length - 1);
   allRecords = allRecords.filter((r) => r.phase_index !== idx);
   allRecords = allRecords.map((r) =>
     r.phase_index > idx ? { ...r, phase_index: r.phase_index - 1 } : r
   );
+
   renderSidebarPhases();
   renderPhase();
+  showSaveToast('Phase marked for deletion. Click Save All Changes to confirm.');
+  showPendingIndicator();
+}
+
+async function deleteRecordsFromServer(records) {
+  if (!records || records.length === 0) return { success: true };
+  const results = await Promise.all(
+    records.map((record) =>
+      window.dataSdk.delete(record).catch((error) => ({ isOk: false, error, record }))
+    )
+  );
+  const failed = results.filter((res) => !res || !res.isOk);
+  return { success: failed.length === 0, failed };
+}
+
+function removePendingChangesForPhase(phaseIdx) {
+  Object.keys(pendingChanges).forEach((key) => {
+    if (key === `phase_${phaseIdx}` || key.startsWith(`section_${phaseIdx}_`)) {
+      delete pendingChanges[key];
+    }
+  });
+  showPendingIndicator();
+}
+
+function removePendingChangesForSection(phaseIdx, sectionIdx) {
+  const sectionKey = `section_${phaseIdx}_${sectionIdx}`;
+  if (pendingChanges[sectionKey]) {
+    delete pendingChanges[sectionKey];
+    showPendingIndicator();
+  }
 }
 
 function showPhase(index) {
@@ -437,9 +480,23 @@ function deleteSection(idx) {
   document.body.appendChild(modal);
 }
 
-function confirmDeleteSection(idx) {
+async function confirmDeleteSection(idx) {
   document.getElementById('delete-section-modal').remove();
   const p = phases[currentPhase];
+  const affectedRecords = allRecords.filter(
+    (r) => r.phase_index === currentPhase && r.section_index === idx
+  );
+
+  affectedRecords.forEach((record) => {
+    if (record._id) {
+      pendingChanges[`delete_${record._id}`] = {
+        _delete: true,
+        _id: record._id
+      };
+    }
+  });
+
+  removePendingChangesForSection(currentPhase, idx);
   p.sections.splice(idx, 1);
   allRecords = allRecords.filter(
     (r) => !(r.phase_index === currentPhase && r.section_index === idx)
@@ -449,7 +506,10 @@ function confirmDeleteSection(idx) {
       ? { ...r, section_index: r.section_index - 1 }
       : r
   );
+
   renderPhase();
+  showSaveToast('Sub-phase marked for deletion. Click Save All Changes to confirm.');
+  showPendingIndicator();
 }
 
 function editSectionLink(secIdx) {
@@ -619,9 +679,7 @@ function showPendingIndicator() {
 async function saveAllChanges() {
   const btn = document.getElementById('save-all-btn') || document.getElementById('save-all-fixed-btn');
   if (!btn) return;
-  debugLog('saveAllChanges - pendingChanges count:', Object.keys(pendingChanges).length);
   if (Object.keys(pendingChanges).length === 0) {
-    debugLog('saveAllChanges - no pending changes, aborting');
     showSaveToast('No pending changes to save.', true);
     return;
   }
@@ -630,11 +688,26 @@ async function saveAllChanges() {
   btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> Saving...';
 
   try {
-    const changesToSave = Object.values(pendingChanges);
-    debugLog('saveAllChanges - changesToSave:', changesToSave);
-    const result = await window.dataSdk.bulkCreate(changesToSave);
-    debugLog('saveAllChanges - bulkCreate result:', result);
-    if (!result.isOk) throw new Error('Save failed');
+    const pendingValues = Object.values(pendingChanges);
+    const changesToSave = pendingValues.filter((c) => !c._delete);
+    const deletesToProcess = pendingValues.filter((c) => c._delete);
+
+    if (changesToSave.length > 0) {
+      const result = await window.dataSdk.bulkCreate(changesToSave);
+      if (!result.isOk) throw new Error('Save failed');
+    }
+
+    if (deletesToProcess.length > 0) {
+      const deleteResults = await Promise.all(
+        deletesToProcess.map((del) =>
+          window.dataSdk.delete({ _id: del._id }).catch((error) => ({ isOk: false, error, del }))
+        )
+      );
+      const failedDeletes = deleteResults.filter((res) => !res || !res.isOk);
+      if (failedDeletes.length > 0) {
+        throw new Error(`Failed to delete ${failedDeletes.length} item(s)`);
+      }
+    }
 
     pendingChanges = {};
     btn.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i> Saved!';
@@ -648,7 +721,6 @@ async function saveAllChanges() {
     showSaveToast('All changes saved successfully.');
     initApp();
   } catch (err) {
-    debugLog('saveAllChanges - Caught error:', err);
     btn.disabled = false;
     btn.innerHTML = '<i data-lucide="alert-circle" class="w-4 h-4"></i> Save Failed';
     btn.style.background = '#ef4444';

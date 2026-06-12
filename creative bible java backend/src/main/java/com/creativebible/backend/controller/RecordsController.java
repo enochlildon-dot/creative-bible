@@ -1,6 +1,7 @@
 package com.creativebible.backend.controller;
 
 import com.creativebible.backend.model.Record;
+import com.creativebible.backend.repository.RecordRepository;
 import com.creativebible.backend.service.StorageService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -22,9 +23,11 @@ public class RecordsController {
 
     private static final Logger logger = LoggerFactory.getLogger(RecordsController.class);
     private final StorageService storage;
+    private final RecordRepository recordRepository;
 
-    public RecordsController(StorageService storage) {
+    public RecordsController(StorageService storage, RecordRepository recordRepository) {
         this.storage = storage;
+        this.recordRepository = recordRepository;
     }
 
     @GetMapping
@@ -93,14 +96,19 @@ public class RecordsController {
     }
 
     @DeleteMapping
-    public ResponseEntity<?> deleteRecord(@RequestBody Record record) {
-        if (record == null) return ResponseEntity.badRequest().body("Invalid payload");
-        List<Record> records = storage.loadRecords();
-        int idx = storage.findRecordIndex(records, record);
-        if (idx == -1) return ResponseEntity.status(404).body("Record not found");
-        records.remove(idx);
-        storage.saveRecords(records);
-        return ResponseEntity.ok().body(new ApiResponse(true, null));
+    public ResponseEntity<ApiResponse> deleteRecord(@RequestBody Record record) {
+        if (record == null || record.get_id() == null) {
+            logger.error("DELETE /api/records missing _id");
+            return ResponseEntity.badRequest().body(new ApiResponse(false, "Missing _id"));
+        }
+
+        try {
+            recordRepository.deleteById(record.get_id());
+            return ResponseEntity.ok().body(new ApiResponse(true, "Deleted"));
+        } catch (Exception e) {
+            logger.error("Failed to delete record with _id {}: {}", record.get_id(), e.getMessage(), e);
+            return ResponseEntity.status(404).body(new ApiResponse(false, "Record not found or already deleted"));
+        }
     }
 
     static class ApiResponse {

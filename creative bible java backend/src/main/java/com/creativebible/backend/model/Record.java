@@ -1,6 +1,7 @@
 package com.creativebible.backend.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.util.UUID;
@@ -9,6 +10,7 @@ import java.util.UUID;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Record {
     @Id
+    @JsonProperty("_id")
     private String _id;
     public String type;
     public Integer phase_index;
